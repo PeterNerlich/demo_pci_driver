@@ -8,12 +8,6 @@
 #define MY_VENDOR_ID 0x144a
 #define MY_DEVICE_ID 0x9111
 
-/*
-int pci_read_config_byte(struct pci_def *dev, int offset, u8 *val);
-int pci_read_config_word(struct pci_def *dev, int offset, u16 *val);
-int pci_read_config_dword(struct pci_def *dev, int offset, u32 *val);
-*/
-
 static char hello_world[] = "Hello World\n";
 
 static unsigned long ioport=0L, iolen=0L, memstart=0L, memlen=0L;
@@ -57,8 +51,7 @@ static irqreturn_t pci_isr( int irq, void *dev_id )
 	return IRQ_HANDLED;
 }
 
-static int device_init(struct pci_dev *pdev,
-	const struct pci_device_id *id)
+static int device_init( struct pci_dev *pdev, const struct pci_device_id *id )
 {
 	if( pci_enable_device( pdev ) )
 		return -EIO;
@@ -75,11 +68,13 @@ static int device_init(struct pci_dev *pdev,
 		dev_err(&pdev->dev,"Memory address conflict for device\n");
 		goto cleanup_ports;
 	}
-	if(request_irq(pdev->irq,pci_isr,IRQF_SHARED,
-		"mypci",pdev)) {
+	if( request_irq(pdev->irq,pci_isr,IRQF_SHARED, "mypci",pdev) ) {
 		dev_err(&pdev->dev,"mypci: IRQ %d not free.\n",pdev->irq);
 		goto cleanup_mem;
 	}
+	pci_write_config_byte(pdev, ioport+0x06, 0x0);  // set channel 0
+	pci_write_config_byte(pdev, ioport+0x08, 0x0);  // set signal range to ±10V
+	pci_write_config_byte(pdev, ioport+0x0A, 0x0);  // set trigger to software/polling
 	return 0;
 cleanup_mem:
 	release_mem_region( memstart, memlen );
