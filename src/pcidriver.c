@@ -18,18 +18,22 @@ static struct device *mypci_dev;
 
 static int driver_open( struct inode *devfile, struct file *instance )
 {
-	dev_info( mypci_dev, "driver_open called\n" );
+	printk(KERN_INFO "mypci driver_open\n");
+	//dev_info( mypci_dev, "driver_open called\n" );
 	return 0;
 }
 
 static int driver_close( struct inode *devfile, struct file *instance )
 {
-	dev_info( mypci_dev, "driver_close called\n" );
+	printk(KERN_INFO "mypci driver_close\n");
+	//dev_info( mypci_dev, "driver_close called\n" );
 	return 0;
 }
 
 static ssize_t driver_read( struct file *instance, char __user *user, size_t count, loff_t *offset )
 {
+	printk(KERN_INFO "mypci driver_read\n");
+
 	unsigned int status, data;
 
 	status = inw(ioport+0x08);	// read status
@@ -67,6 +71,8 @@ static struct file_operations fops = {
 
 static int device_init( struct pci_dev *pdev, const struct pci_device_id *id )
 {
+	printk(KERN_INFO "mypci device_init\n");
+
 	if( pci_enable_device( pdev ) )
 		return -EIO;
 	ioport = pci_resource_start( pdev, 2 );
@@ -79,11 +85,16 @@ static int device_init( struct pci_dev *pdev, const struct pci_device_id *id )
 	pci_write_config_byte(pdev, ioport+0x06, 0x0);  // set channel 0
 	pci_write_config_byte(pdev, ioport+0x08, 0x0);  // set signal range to ±10V
 	pci_write_config_byte(pdev, ioport+0x0A, 0x0);  // set trigger to software/polling
+
+	mypci_dev = device_create( mypci_class, NULL, mypci_dev_number, NULL, "%s", "mypci" );
 	return 0;
 }
 
 static void device_deinit( struct pci_dev *pdev )
 {
+	printk(KERN_INFO "mypci device_deinit\n");
+
+	device_destroy( mypci_class, mypci_dev_number );  // remove the device file
 	free_irq( pdev->irq, pdev );
 	if( ioport )
 		release_region( ioport, iolen );
@@ -107,6 +118,8 @@ static struct pci_driver pci_drv = {
 
 static int __init mod_init(void)
 {
+	printk(KERN_INFO "mypci mod_init\n");
+
 	if( alloc_chrdev_region(&mypci_dev_number,0,1,"mypci")<0 )
 		return -EIO;
 	driver_object = cdev_alloc(); /* Anmeldeobjekt reservieren */
@@ -121,8 +134,6 @@ static int __init mod_init(void)
 		pr_err( "mypci: no udev support available\n");
 		goto free_cdev;
 	}
-	mypci_dev = device_create( mypci_class, NULL, mypci_dev_number,
-		NULL, "%s", "mypci" );
 
 	if( pci_register_driver(&pci_drv)<0)  {
 		device_destroy( mypci_class, mypci_dev_number );
@@ -139,6 +150,8 @@ free_dev_number:
 
 static void __exit mod_exit(void)
 {
+	printk(KERN_INFO "mypci mod_exit\n");
+
 	pci_unregister_driver( &pci_drv );
 
 	device_destroy( mypci_class, mypci_dev_number );  // remove the device file
