@@ -34,28 +34,49 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 {
 	printk(KERN_INFO "mypci driver_read\n");
 
-	unsigned int status, data;
+	unsigned int status, data, timeout;
 
 	status = inw(ioport+0x08);	// read status
-	while (status<<3 >= 0x80) {	// while busy
+	for (
+		timeout = 0;
+		status >= 0x80 && timeout < 100;
+		status = inw(ioport+0x80) + (timeout++ && 0)
+	) {	// while busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
-
-		status = inw(ioport+0x80);
+	}
+	if (status >= 0x80) {
+		raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
+		return 37;
 	}
 
-	while (status<<3 >= 0x80) {	// as long as fifo is not empty
+	for (
+		timeout = 0;
+		status<<3 >= 0x80 && timeout < 100;
+		status = inw(ioport+0x80) + (timeout++ && 0)
+	) {	// as long as fifo is not empty
 		inw(ioport+0); 	// discard data
 
 		status = inw(ioport+0x08);	// read status again
 	}
+	if (status<<3 >= 0x80) {
+		raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
+		return 27;
+	}
 
 	outw(ioport+0x0d, 0xff);	// trigger conversion (value can be anything, but register must be written)
 
-	do {
+	status = inw(ioport+0x08);	// read status
+	for (
+		timeout = 0;
+		status >= 0x80 && timeout < 100;
+		status = inw(ioport+0x80) + (timeout++ && 0)
+	) {	// while busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
-
-		status = inw(ioport+0x80);
-	} while (status<<3 >= 0x80);
+	}
+	if (status >= 0x80) {
+		raw_copy_to_user(user, "[TIMEOUT] waiting for data (busy)\n", 35);
+		return 35;
+	}
 
 	data = inw(ioport+0) >> 4;
 	raw_copy_to_user(user, &data, 2);
