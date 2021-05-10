@@ -1,14 +1,13 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
+#include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
 
 #define MY_VENDOR_ID 0x144a
 #define MY_DEVICE_ID 0x9111
-
-static char hello_world[] = "Hello World\n";
 
 static unsigned long ioport=0L, iolen=0L, memstart=0L, memlen=0L;
 
@@ -31,12 +30,32 @@ static int driver_close( struct inode *devfile, struct file *instance )
 
 static ssize_t driver_read( struct file *instance, char __user *user, size_t count, loff_t *offset )
 {
-	unsigned long not_copied, to_copy;
+	unsigned int status, data;
 
-	to_copy = min(count, strlen(hello_world)+1);
-	not_copied = raw_copy_to_user(user, hello_world, to_copy);
-	*offset += to_copy - not_copied;
-	return to_copy - not_copied;
+	status = inw(ioport+0x08);	// read status
+	while (status<<3 >= 0x80) {	// while busy
+		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
+
+		status = inw(ioport+0x80);
+	}
+
+	while (status<<3 >= 0x80) {	// as long as fifo is not empty
+		inw(ioport+0); 	// discard data
+
+		status = inw(ioport+0x08);	// read status again
+	}
+
+	outw(ioport+0x0d, 0xff);	// trigger conversion (value can be anything, but register must be written)
+
+	do {
+		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
+
+		status = inw(ioport+0x80);
+	} while (status<<3 >= 0x80);
+
+	data = inw(ioport+0) >> 4;
+	raw_copy_to_user(user, &data, 2);
+	return 2;
 }
 
 static struct file_operations fops = {
@@ -45,11 +64,6 @@ static struct file_operations fops = {
 	.open = driver_open,
 	.release = driver_close,
 };
-
-static irqreturn_t pci_isr( int irq, void *dev_id )
-{
-	return IRQ_HANDLED;
-}
 
 static int device_init( struct pci_dev *pdev, const struct pci_device_id *id )
 {
@@ -62,25 +76,10 @@ static int device_init( struct pci_dev *pdev, const struct pci_device_id *id )
 			pdev->dev.kobj.name);
 		return -EIO;
 	}
-	memstart = pci_resource_start( pdev, 1 );
-	memlen = pci_resource_len( pdev, 1 );
-	if( request_mem_region(memstart,memlen,pdev->dev.kobj.name)==NULL ) {
-		dev_err(&pdev->dev,"Memory address conflict for device\n");
-		goto cleanup_ports;
-	}
-	if( request_irq(pdev->irq,pci_isr,IRQF_SHARED, "mypci",pdev) ) {
-		dev_err(&pdev->dev,"mypci: IRQ %d not free.\n",pdev->irq);
-		goto cleanup_mem;
-	}
 	pci_write_config_byte(pdev, ioport+0x06, 0x0);  // set channel 0
 	pci_write_config_byte(pdev, ioport+0x08, 0x0);  // set signal range to ±10V
 	pci_write_config_byte(pdev, ioport+0x0A, 0x0);  // set trigger to software/polling
 	return 0;
-cleanup_mem:
-	release_mem_region( memstart, memlen );
-cleanup_ports:
-	release_region( ioport, iolen );
-	return -EIO;
 }
 
 static void device_deinit( struct pci_dev *pdev )
