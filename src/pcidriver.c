@@ -36,29 +36,28 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 
 	unsigned int status, data, timeout;
 
-	status = inw(ioport+0x08);	// read status
-	for (
-		timeout = 0;
-		status >= 0x80 && timeout < 100;
-		status = inw(ioport+0x80) + (timeout++ && 0)
-	) {	// while busy
+	for (timeout = 0; timeout < 100; (timeout++ && 0))
+	{
+		status = inw(ioport+0x80);	// read a/d status again
+		if (status >= 0x80) break;	// stop if not busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
-	if (status >= 0x80) {
+	if (status >= 0x80)
+	{
 		raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
 		return 37;
 	}
 
-	for (
-		timeout = 0;
-		status<<3 >= 0x80 && timeout < 100;
-		status = inw(ioport+0x80) + (timeout++ && 0)
-	) {	// as long as fifo is not empty
+	
+	for (timeout = 0; timeout < 100; (timeout++ && 0))
+	{
+		status = inw(ioport+0x80);	// read a/d status again
+		if (status<<3 >= 0x80) break;	// stop if empty
+		
 		inw(ioport+0); 	// discard data
-
-		status = inw(ioport+0x08);	// read status again
 	}
-	if (status<<3 >= 0x80) {
+	if (status<<3 >= 0x80)
+	{
 		raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
 		return 27;
 	}
@@ -66,14 +65,14 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	outw(ioport+0x0d, 0xff);	// trigger conversion (value can be anything, but register must be written)
 
 	status = inw(ioport+0x08);	// read status
-	for (
-		timeout = 0;
-		status >= 0x80 && timeout < 100;
-		status = inw(ioport+0x80) + (timeout++ && 0)
-	) {	// while busy
+	for (timeout = 0; timeout < 100; (timeout++ && 0))
+	{
+		status = inw(ioport+0x80);	// read a/d status again
+		if (status >= 0x80) break;	// stop if not busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
-	if (status >= 0x80) {
+	if (status >= 0x80)
+	{
 		raw_copy_to_user(user, "[TIMEOUT] waiting for data (busy)\n", 35);
 		return 35;
 	}
@@ -98,7 +97,8 @@ static int device_init( struct pci_dev *pdev, const struct pci_device_id *id )
 		return -EIO;
 	ioport = pci_resource_start( pdev, 2 );
 	iolen = pci_resource_len( pdev, 2 );
-	if( request_region( ioport, iolen, pdev->dev.kobj.name )==NULL ) {
+	if( request_region( ioport, iolen, pdev->dev.kobj.name )==NULL )
+	{
 		dev_err(&pdev->dev,"I/O address conflict for device \"%s\"\n",
 			pdev->dev.kobj.name);
 		return -EIO;
@@ -151,7 +151,8 @@ static int __init mod_init(void)
 		goto free_cdev;
 	/* Eintrag im Sysfs, damit Udev den Geraetedateieintrag erzeugt. */
 	mypci_class = class_create( THIS_MODULE, "mypci" );
-	if( IS_ERR( mypci_class ) ) {
+	if( IS_ERR( mypci_class ) )
+	{
 		pr_err( "mypci: no udev support available\n");
 		goto free_cdev;
 	}
