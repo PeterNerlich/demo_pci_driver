@@ -6,12 +6,14 @@
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
 
+// vendor and device ids as specified
 #define MY_VENDOR_ID 0x144a
 #define MY_DEVICE_ID 0x9111
 
-static unsigned long ioport=0L, iolen=0L, memstart=0L, memlen=0L;
+// base address of the device and length of the memory region
+static unsigned long ioport=0L, iolen=0L;
 
-static dev_t mypci_dev_number;
+static dev_t mypci_dev_number;	// future device number of the device
 static struct cdev *driver_object;
 static struct class *mypci_class;
 static struct device *mypci_dev;
@@ -34,8 +36,9 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 {
 	printk(KERN_INFO "mypci driver_read\n");
 
-	u8 status, timeout;
+	u8 status, timeout, length;
 	u16 data;
+	char outs[8];	// buffer for formatting output to ascii
 
 	for (timeout = 0; timeout < 25; timeout++)
 	{
@@ -44,9 +47,9 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
 	if (status & 0x80 == 0)
-	{
+	{	// if we left the loop because of timeout
 		raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
-		return 37;
+		return 37;	// that is the length of the string plus the null byte
 	}
 	
 	for (timeout = 0; timeout < 25; timeout++)
@@ -57,9 +60,9 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		inw(ioport+0); 	// discard data
 	}
 	if (status & 0x80 == 0)
-	{
+	{	// if we left the loop because of timeout
 		raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
-		return 27;
+		return 27;	// that is the length of the string plus the null byte
 	}
 
 	outw(ioport+0x0d, 0xff);	// trigger conversion (value can be anything, but register must be written)
@@ -71,14 +74,15 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
 	if (status & 0x80 == 0)
-	{
+	{	// if we left the loop because of timeout
 		raw_copy_to_user(user, "[TIMEOUT] waiting for data (busy)\n", 35);
-		return 35;
+		return 35;	// that is the length of the string plus the null byte
 	}
 
-	data = inw(ioport+0) >> 4;
-	raw_copy_to_user(user, &data, 2);
-	return 2;
+	data = inw(ioport+0) >> 4;	// read a/d input register, discarding the bits encoding the channel number
+	length = snprintf(outs, 8, "%d\n", data);	// format the read number to a string of max length 8 (including null character)
+	raw_copy_to_user(user, &outs, length+1);
+	return length+1;
 }
 
 static struct file_operations fops = {
