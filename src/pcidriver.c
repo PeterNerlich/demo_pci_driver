@@ -38,7 +38,8 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 
 	u8 status, timeout, length;
 	u16 data;
-	char outs[8];	// buffer for formatting output to ascii
+	int volt;
+	char outs[32];	// buffer for formatting output to ascii
 
 	for (timeout = 0; timeout < 25; timeout++)
 	{
@@ -80,7 +81,13 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	}
 
 	data = inw(ioport+0) >> 4;	// read a/d input register, discarding the bits encoding the channel number
-	length = snprintf(outs, 8, "%d\n", data);	// format the read number to a string of max length 8 (including null character)
+	/*	                  1     10
+		Voltage = data × ——— × ————
+		                  K    gain
+		K    = 2047×16 = 32752
+		gain = 1		*/
+	volt = data * 10 / 32752;
+	length = snprintf(outs, 32, "%d V\n", volt);	// format the read number to a string of max length 8 (including null character)
 	raw_copy_to_user(user, &outs, length+1);
 	return length+1;
 }
