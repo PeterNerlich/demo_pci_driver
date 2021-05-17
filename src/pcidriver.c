@@ -141,13 +141,13 @@ static int __init mod_init(void)
 {
 	printk(KERN_INFO "mypci mod_init\n");
 
-	if( alloc_chrdev_region(&mypci_dev_number,0,1,"mypci")<0 )
+	if( alloc_chrdev_region(&mypci_dev_number, 0, 1, "mypci") < 0 )
 		return -EIO;
 	driver_object = cdev_alloc(); /* Anmeldeobjekt reservieren */
-	if( driver_object==NULL ) goto free_dev_number;
+	if( driver_object == NULL ) goto free_dev_number;
 		driver_object->owner = THIS_MODULE;
 	driver_object->ops = &fops;
-	if( cdev_add(driver_object,mypci_dev_number,1) )
+	if( cdev_add(driver_object, mypci_dev_number, 1) )
 		goto free_cdev;
 	/* Eintrag im Sysfs, damit Udev den Geraetedateieintrag erzeugt. */
 	mypci_class = class_create( THIS_MODULE, "mypci" );
@@ -157,7 +157,7 @@ static int __init mod_init(void)
 		goto free_cdev;
 	}
 
-	if( pci_register_driver(&pci_drv)<0)  {
+	if( pci_register_driver(&pci_drv) < 0)  {
 		device_destroy( mypci_class, mypci_dev_number );
 		goto free_dev_number;
 	}
