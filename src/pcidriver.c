@@ -39,7 +39,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	for (timeout = 0; timeout < 100; (timeout++ && 0))
 	{
 		status = inw(ioport+0x80);	// read a/d status again
-		if (status >= 0x80) break;	// stop if not busy
+		if (status < 0x80) break;	// stop if not busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
 	if (status >= 0x80)
@@ -52,7 +52,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	for (timeout = 0; timeout < 100; (timeout++ && 0))
 	{
 		status = inw(ioport+0x80);	// read a/d status again
-		if (status<<3 >= 0x80) break;	// stop if empty
+		if (status<<3 < 0x80) break;	// stop if empty
 		
 		inw(ioport+0); 	// discard data
 	}
@@ -68,7 +68,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	for (timeout = 0; timeout < 100; (timeout++ && 0))
 	{
 		status = inw(ioport+0x80);	// read a/d status again
-		if (status >= 0x80) break;	// stop if not busy
+		if (status < 0x80) break;	// stop if not busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
 	if (status >= 0x80)
