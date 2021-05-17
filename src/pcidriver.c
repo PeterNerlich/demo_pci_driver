@@ -4,6 +4,7 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
+#include <linux/math64.h>
 #include <asm/uaccess.h>
 
 // vendor and device ids as specified
@@ -38,7 +39,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 
 	u8 status, timeout, length;
 	u16 data;
-	int volt;
+	s64 volt;
 	char outs[32];	// buffer for formatting output to ascii
 
 	for (timeout = 0; timeout < 25; timeout++)
@@ -86,8 +87,8 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		                  K    gain
 		K    = 2047×16 = 32752
 		gain = 1		*/
-	volt = data * 10 / 32752;
-	length = snprintf(outs, 32, "%d V\n", volt);	// format the read number to a string of max length 8 (including null character)
+	volt = div_s64(data * 10, 32752);
+	length = snprintf(outs, 32, "%lld V\n", volt);	// format the read number to a string of max length 8 (including null character)
 	raw_copy_to_user(user, &outs, length+1);
 	return length+1;
 }
