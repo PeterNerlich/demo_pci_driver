@@ -34,29 +34,29 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 {
 	printk(KERN_INFO "mypci driver_read\n");
 
-	unsigned int status, data, timeout;
+	u8 status, timeout;
+	u16 data;
 
-	for (timeout = 0; timeout < 100; (timeout++ && 0))
+	for (timeout = 0; timeout < 25; timeout++)
 	{
-		status = inw(ioport+0x80);	// read a/d status again
-		if (status < 0x80) break;	// stop if not busy
+		status = inb(ioport+0x80);	// read a/d status again
+		if (status & 0x80 > 0) break;	// stop if not busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
-	if (status >= 0x80)
+	if (status & 0x80 == 0)
 	{
 		raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
 		return 37;
 	}
-
 	
-	for (timeout = 0; timeout < 100; (timeout++ && 0))
+	for (timeout = 0; timeout < 25; timeout++)
 	{
-		status = inw(ioport+0x80);	// read a/d status again
-		if (status<<3 < 0x80) break;	// stop if empty
+		status = inb(ioport+0x80);	// read a/d status again
+		if (status & 0x10 > 0) break;	// stop if empty
 		
 		inw(ioport+0); 	// discard data
 	}
-	if (status<<3 >= 0x80)
+	if (status & 0x80 == 0)
 	{
 		raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
 		return 27;
@@ -64,14 +64,13 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 
 	outw(ioport+0x0d, 0xff);	// trigger conversion (value can be anything, but register must be written)
 
-	status = inw(ioport+0x08);	// read status
-	for (timeout = 0; timeout < 100; (timeout++ && 0))
+	for (timeout = 0; timeout < 25; timeout++)
 	{
-		status = inw(ioport+0x80);	// read a/d status again
-		if (status < 0x80) break;	// stop if not busy
+		status = inb(ioport+0x80);	// read a/d status again
+		if (status & 0x80 > 0) break;	// stop if not busy
 		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
 	}
-	if (status >= 0x80)
+	if (status & 0x80 == 0)
 	{
 		raw_copy_to_user(user, "[TIMEOUT] waiting for data (busy)\n", 35);
 		return 35;
@@ -116,11 +115,8 @@ static void device_deinit( struct pci_dev *pdev )
 	printk(KERN_INFO "mypci device_deinit\n");
 
 	device_destroy( mypci_class, mypci_dev_number );  // remove the device file
-	free_irq( pdev->irq, pdev );
 	if( ioport )
 		release_region( ioport, iolen );
-	if( memstart )
-		release_mem_region( memstart, memlen );
 }
 
 static struct file_operations fops;
