@@ -65,7 +65,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		return 27;	// that is the length of the string plus the null byte
 	}
 
-	outw(ioport+0x0d, 0xff);	// trigger conversion (value can be anything, but register must be written)
+	outb(0xff, ioport+0x0d);	// trigger conversion (value can be anything, but register must be written)
 
 	for (timeout = 0; timeout < 25; timeout++)
 	{
