@@ -81,7 +81,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		return 35;	// that is the length of the string plus the null byte
 	}
 
-	data = inw(ioport+0) >> 4;	// read a/d input register, discarding the bits encoding the channel number
+	data = inw(ioport+0) & 0xfff0;	// read a/d input register, truncating the bits encoding the channel number
 	/*	                  1     10
 		Voltage = data × ——— × ————
 		                  K    gain
