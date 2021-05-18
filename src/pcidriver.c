@@ -87,8 +87,17 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		                  K    gain
 		K    = 2047×16 = 32752
 		gain = 1		*/
-	volt = div_s64(data * 10, 32752);
-	length = snprintf(outs, 32, "%lld V\n", volt);	// format the read number to a string of max length 8 (including null character)
+	/* if we have 64 bit to do the calculation, and our dividend is only 16 bit, we can use the rest to get more precision!
+	the above requires us to multiply data by ten, we should be able to do that 13 more times without risking an overflow. that means 13 decimal places for free! with no floating point magic whatsoever!
+	*/
+	volt = div_s64(data * 10 * pow(10, 13), 32752);
+	length = snprintf(outs, 32, "%lld", volt);	// format the read number to a string
+	for (int i = length; i > length-13; --i)
+	{	// shift 14 digits one place later
+		outs[i] = outs[i-1];
+	}
+	outs[length-13] = '.';	// insert the dot
+	length = snprintf(outs, 32, "%s V\n", outs);	// typeset the whole to a string of max length of 32 (including null character)
 	raw_copy_to_user(user, &outs, length+1);
 	return length+1;
 }
