@@ -108,8 +108,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	that means 13 decimal places for free! with no floating point magic whatsoever! yaay!
 	*/
 	pow = 1;
-	//for (i = 0; i < 13; i++)
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 13; i++)
 	{
 		pow = pow * 10;
 	}
@@ -119,7 +118,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	length = snprintf(outs, 32, "%lld", volt);	// format the read number to a string
 	printk(KERN_INFO "mypci driver_read volt without dot: %s (%d)\n", outs, length);
 	// wait a minute, what about the decimal point?
-	for (i = length; i > length-13; --i)
+	for (i = length; i > length-13; i--)
 	{	// shift 14 digits one place later
 		outs[i] = outs[i-1];
 	}
