@@ -39,30 +39,32 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 {	// 'read' operation for the device file
 	// we want this to trigger the measurement and give the result
 	u8 status, timeout, length, i;
-	u16 data, pow;
-	s64 volt;
+	s64 data, volt, pow;
 	char outs[32];	// buffer for formatting output to ascii
 
 	printk(KERN_INFO "mypci driver_read\n");
 
 	for (timeout = 0; timeout < 25; timeout++)
 	{	// waiting for the converter to become available
+		printk(KERN_INFO "mypci driver_read wait for ready...\n");
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
 		if ((status & 0x80) > 0) break;	// stop if not busy
-		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
+		usleep_range(100, 1000);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 		// we use 'usleep_range' so we don't block the whole kernel
 		// usleep ensures we are woken up at least at the last duration specified
 		// but we might be called as early as the first duration specified if there's already another convenient interrupt going on
 	}
 	if ((status & 0x80) == 0)
 	{	// if we left the loop not normally but because of timeout
+		printk(KERN_INFO "mypci driver_read [TIMEOUT] waiting for device (busy)\n");
 		raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
 		return 37;	// that is the length of the string plus the null byte
 	}
 	
 	for (timeout = 0; timeout < 25; timeout++)
 	{	// waiting for the converter to become empty
+		printk(KERN_INFO "mypci driver_read wait for empty...\n");
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
 		if ((status & 0x10) > 0) break;	// stop if empty
@@ -71,6 +73,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	}
 	if ((status & 0x10) == 0)
 	{	// if we left the loop because of timeout
+		printk(KERN_INFO "mypci driver_read [TIMEOUT] discarding data\n");
 		raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
 		return 27;	// that is the length of the string plus the null byte
 	}
@@ -79,18 +82,21 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 
 	for (timeout = 0; timeout < 25; timeout++)
 	{	// waiting for the converter to become available
+		printk(KERN_INFO "mypci driver_read wait for ready\n");
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
 		if ((status & 0x80) > 0) break;	// stop if not busy
-		usleep_range(5000, 10000);	// sleep for a minimum of 5 and maximum of 10 milliseconds
+		usleep_range(100, 1000);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 	}
 	if ((status & 0x80) == 0)
 	{	// if we left the loop because of timeout
+		printk(KERN_INFO "mypci driver_read [TIMEOUT] waiting for data (busy)\n");
 		raw_copy_to_user(user, "[TIMEOUT] waiting for data (busy)\n", 35);
 		return 35;	// that is the length of the string plus the null byte
 	}
 
 	data = inw(ioport+0) & 0xfff0;	// read a/d input register, truncating the bits encoding the channel number
+	printk(KERN_INFO "mypci driver_read got raw data\n");
 	/*	                  1     10
 		Voltage = data × ——— × ————
 		                  K    gain
@@ -105,7 +111,9 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	{
 		pow = pow * 10;
 	}
+	printk(KERN_INFO "mypci driver_read got pow\n");
 	volt = div_s64(data * 10 * pow, 32752);	// kinda adjusted formula: data boosted to 13 extra decimal places, devision only last step
+	printk(KERN_INFO "mypci driver_read did raw volt calculation\n");
 	length = snprintf(outs, 32, "%lld", volt);	// format the read number to a string
 	// wait a minute, what about the decimal point?
 	for (i = length; i > length-13; --i)
@@ -115,6 +123,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	outs[length-13] = '.';	// insert the dot
 	length = snprintf(outs, 32, "%s V\n", outs);	// typeset the whole to a string of max length of 32 (including null character)
 	raw_copy_to_user(user, &outs, length+1);	// and out with it to userspace!
+	printk(KERN_INFO "mypci driver_read fully typeset\n");
 	return length+1;
 }
 
