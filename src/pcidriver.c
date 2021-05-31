@@ -123,8 +123,11 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	{	// shift 14 digits one place later
 		outs[i] = outs[i-1];
 	}
+	printk(KERN_INFO "mypci driver_read shifted 13 digits: %s\n", outs);
 	outs[length-13] = '.';	// insert the dot
+	printk(KERN_INFO "mypci driver_read here comes the dot: %s\n", outs);
 	length = snprintf(outs, 32, "%s V\n", outs);	// typeset the whole to a string of max length of 32 (including null character)
+	printk(KERN_INFO "mypci driver_read nice typesetting: %s\n", outs);
 	raw_copy_to_user(user, &outs, length+1);	// and out with it to userspace!
 	printk(KERN_INFO "mypci driver_read fully typeset: %s\n", outs);
 	return length+1;
