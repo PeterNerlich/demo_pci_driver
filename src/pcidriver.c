@@ -46,11 +46,11 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 
 	for (timeout = 0; timeout < 25; timeout++)
 	{	// waiting for the converter to become available
-		printk(KERN_INFO "mypci driver_read wait for ready...\n");
+		printk(KERN_INFO "mypci driver_read wait for ready %d\n", timeout);
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
 		if ((status & 0x80) > 0) break;	// stop if not busy
-		usleep_range(100, 1000);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
+		usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 		// we use 'usleep_range' so we don't block the whole kernel
 		// usleep ensures we are woken up at least at the last duration specified
 		// but we might be called as early as the first duration specified if there's already another convenient interrupt going on
@@ -64,7 +64,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	
 	for (timeout = 0; timeout < 25; timeout++)
 	{	// waiting for the converter to become empty
-		printk(KERN_INFO "mypci driver_read wait for empty...\n");
+		printk(KERN_INFO "mypci driver_read wait for empty %d\n", timeout);
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
 		if ((status & 0x10) > 0) break;	// stop if empty
@@ -82,11 +82,11 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 
 	for (timeout = 0; timeout < 25; timeout++)
 	{	// waiting for the converter to become available
-		printk(KERN_INFO "mypci driver_read wait for ready\n");
+		printk(KERN_INFO "mypci driver_read wait for ready %d\n", timeout);
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
 		if ((status & 0x80) > 0) break;	// stop if not busy
-		usleep_range(100, 1000);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
+		usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 	}
 	if ((status & 0x80) == 0)
 	{	// if we left the loop because of timeout
@@ -96,7 +96,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	}
 
 	data = inw(ioport+0) & 0xfff0;	// read a/d input register, truncating the bits encoding the channel number
-	printk(KERN_INFO "mypci driver_read got raw data\n");
+	printk(KERN_INFO "mypci driver_read raw data: %lld\n", data);
 	/*	                  1     10
 		Voltage = data × ——— × ————
 		                  K    gain
@@ -106,14 +106,15 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	the above requires us to multiply data by ten, we should be able to do that 13 more times without risking an overflow.
 	that means 13 decimal places for free! with no floating point magic whatsoever! yaay!
 	*/
-	pow = 10;
-	for (i = 0; i < 13; i++)
+	pow = 1;
+	//for (i = 0; i < 13; i++)
+	for (i = 0; i < 4; i++)
 	{
 		pow = pow * 10;
 	}
-	printk(KERN_INFO "mypci driver_read got pow\n");
+	printk(KERN_INFO "mypci driver_read pow reached: %lld\n", pow);
 	volt = div_s64(data * 10 * pow, 32752);	// kinda adjusted formula: data boosted to 13 extra decimal places, devision only last step
-	printk(KERN_INFO "mypci driver_read did raw volt calculation\n");
+	printk(KERN_INFO "mypci driver_read raw volt calculation: %lld\n", volt);
 	length = snprintf(outs, 32, "%lld", volt);	// format the read number to a string
 	// wait a minute, what about the decimal point?
 	for (i = length; i > length-13; --i)
@@ -123,7 +124,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	outs[length-13] = '.';	// insert the dot
 	length = snprintf(outs, 32, "%s V\n", outs);	// typeset the whole to a string of max length of 32 (including null character)
 	raw_copy_to_user(user, &outs, length+1);	// and out with it to userspace!
-	printk(KERN_INFO "mypci driver_read fully typeset\n");
+	printk(KERN_INFO "mypci driver_read fully typeset: %s\n", outs);
 	return length+1;
 }
 
