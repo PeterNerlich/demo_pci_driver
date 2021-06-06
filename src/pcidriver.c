@@ -69,11 +69,11 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		printk(KERN_INFO "mypci driver_read wait for empty %d\n", timeout);
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
-		if ((status & 0x10) > 0) break;	// stop if empty
+		if ((status & 0x10) == 0) break;	// stop if empty
 		
 		inw(ioport+0); 	// discard data
 	}
-	if ((status & 0x10) == 0)
+	if ((status & 0x10) > 0)
 	{	// if we left the loop because of timeout
 		printk(KERN_INFO "mypci driver_read [TIMEOUT] discarding data\n");
 		raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
