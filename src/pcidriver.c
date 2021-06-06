@@ -166,9 +166,9 @@ static int device_init( struct pci_dev *pdev, const struct pci_device_id *id )
 			pdev->dev.kobj.name);
 		return -EIO;
 	}
-	pci_write_config_byte(pdev, ioport+0x06, 0x0);  // set channel 0
-	pci_write_config_byte(pdev, ioport+0x08, 0x0);  // set signal range to ±10V
-	pci_write_config_byte(pdev, ioport+0x0A, 0x0);  // set trigger to software/polling
+	outb(0x0, ioport+0x06);  // set channel 0
+	outb(0x0, ioport+0x08);  // set signal range to ±10V
+	outb(0x0, ioport+0x0A);  // set trigger to software/polling
 
 	// finally, create the device file that userspace can interact with
 	mypci_dev = device_create( mypci_class, NULL, mypci_dev_number, NULL, "%s", "mypci" );
