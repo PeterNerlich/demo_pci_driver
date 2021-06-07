@@ -51,7 +51,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		printk(KERN_INFO "mypci driver_read wait for ready %d\n", timeout);
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
-		if ((status & 0x80) > 0) break;	// stop if not busy
+		if ((status & 0x80) != 0) break;	// stop if not busy
 		usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 		// we use 'usleep_range' so we don't block the whole kernel
 		// usleep ensures we are woken up at least at the last duration specified
@@ -60,24 +60,24 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	if ((status & 0x80) == 0)
 	{	// if we left the loop not normally but because of timeout
 		printk(KERN_INFO "mypci driver_read [TIMEOUT] waiting for device (busy)\n");
-		raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
-		return 37;	// that is the length of the string plus the null byte
+		//raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
+		return 0;// 37;	// that is the length of the string plus the null byte
 	}
-	
+
 	for (timeout = 0; timeout < 25; timeout++)
 	{	// waiting for the converter to become empty
 		printk(KERN_INFO "mypci driver_read wait for empty %d\n", timeout);
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x80);	// read a/d status again
 		if ((status & 0x10) == 0) break;	// stop if empty
-		
+
 		inw(ioport+0); 	// discard data
 	}
-	if ((status & 0x10) > 0)
+	if ((status & 0x10) != 0)
 	{	// if we left the loop because of timeout
 		printk(KERN_INFO "mypci driver_read [TIMEOUT] discarding data\n");
-		raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
-		return 27;	// that is the length of the string plus the null byte
+		//raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
+		return 0;// 27;	// that is the length of the string plus the null byte
 	}
 
 	outb(0xff, ioport+0x0e);	// trigger conversion (value can be anything, but register must be written)
@@ -98,7 +98,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	}*/
 	usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 
-	data = inw(ioport+0) & 0xfff0;	// read a/d input register, truncating the bits encoding the channel number
+	data = inw(ioport+0);// & 0xfff0;	// read a/d input register, truncating the bits encoding the channel number
 	printk(KERN_INFO "mypci driver_read raw data: %d\n", data);
 	/*	                  1     10
 		Voltage = data × ——— × ————
