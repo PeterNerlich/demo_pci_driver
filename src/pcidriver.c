@@ -50,7 +50,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	{	// waiting for the converter to become available
 		printk(KERN_INFO "mypci driver_read wait for ready %d\n", timeout);
 		// try a max of 25 times, else error out
-		status = inb(ioport+0x80);	// read a/d status again
+		status = inb(ioport+0x08);	// read a/d status again
 		if ((status & 0x80) != 0) break;	// stop if not busy
 		usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 		// we use 'usleep_range' so we don't block the whole kernel
@@ -68,7 +68,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	{	// waiting for the converter to become empty
 		printk(KERN_INFO "mypci driver_read wait for empty %d\n", timeout);
 		// try a max of 25 times, else error out
-		status = inb(ioport+0x80);	// read a/d status again
+		status = inb(ioport+0x08);	// read a/d status again
 		if ((status & 0x10) == 0) break;	// stop if empty
 
 		inw(ioport+0); 	// discard data
@@ -86,7 +86,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	{	// waiting for the data to arrive
 		printk(KERN_INFO "mypci driver_read wait for ready %d\n", timeout);
 		// try a max of 25 times, else error out
-		status = inb(ioport+0x80);	// read a/d status again
+		status = inb(ioport+0x08);	// read a/d status again
 		if ((status & 0x10) == 0) break;	// stop if data arrived
 		usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
 	}
