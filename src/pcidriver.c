@@ -38,11 +38,11 @@ static int driver_close( struct inode *devfile, struct file *instance )
 static ssize_t driver_read( struct file *instance, char __user *user, size_t count, loff_t *offset )
 {	// 'read' operation for the device file
 	// we want this to trigger the measurement and give the result
-	u8 status, timeout, length, i;
+	u8 status, timeout;//, length, i;
 	s16 data;
-	s64 volt, pow;
-	bool minus;
-	char outs[32];	// buffer for formatting output to ascii
+	//s64 volt, pow;
+	//bool minus;
+	//char outs[32];	// buffer for formatting output to ascii
 
 	printk(KERN_INFO "mypci driver_read\n");
 
