@@ -23,7 +23,6 @@ static int driver_open( struct inode *devfile, struct file *instance )
 {	// 'open' operation for the device file
 	// we don't really have anything to do here
 	printk(KERN_INFO "mypci driver_open\n");
-	//dev_info( mypci_dev, "driver_open called\n" );
 	return 0;
 }
 
@@ -31,18 +30,14 @@ static int driver_close( struct inode *devfile, struct file *instance )
 {	// 'close' operation for the device file
 	// we don't have anything to do here either
 	printk(KERN_INFO "mypci driver_close\n");
-	//dev_info( mypci_dev, "driver_close called\n" );
 	return 0;
 }
 
 static ssize_t driver_read( struct file *instance, char __user *user, size_t count, loff_t *offset )
 {	// 'read' operation for the device file
 	// we want this to trigger the measurement and give the result
-	u8 status, timeout;//, length, i;
+	u8 status, timeout;
 	s16 data;
-	//s64 volt, pow;
-	//bool minus;
-	//char outs[32];	// buffer for formatting output to ascii
 
 	printk(KERN_INFO "mypci driver_read\n");
 
@@ -52,7 +47,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 		// try a max of 25 times, else error out
 		status = inb(ioport+0x08);	// read a/d status again
 		if ((status & 0x80) != 0) break;	// stop if not busy
-		usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
+		usleep_range(10, 20);	// sleep for a minimum of 10 and a maximum of 20 microseconds
 		// we use 'usleep_range' so we don't block the whole kernel
 		// usleep ensures we are woken up at least at the last duration specified
 		// but we might be called as early as the first duration specified if there's already another convenient interrupt going on
@@ -60,8 +55,7 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	if ((status & 0x80) == 0)
 	{	// if we left the loop not normally but because of timeout
 		printk(KERN_INFO "mypci driver_read [TIMEOUT] waiting for device (busy)\n");
-		//raw_copy_to_user(user, "[TIMEOUT] waiting for device (busy)\n", 37);
-		return 0;// 37;	// that is the length of the string plus the null byte
+		return 0;
 	}
 
 	for (timeout = 0; timeout < 25; timeout++)
@@ -76,70 +70,15 @@ static ssize_t driver_read( struct file *instance, char __user *user, size_t cou
 	if ((status & 0x10) != 0)
 	{	// if we left the loop because of timeout
 		printk(KERN_INFO "mypci driver_read [TIMEOUT] discarding data\n");
-		//raw_copy_to_user(user, "[TIMEOUT] discarding data\n", 27);
-		return 0;// 27;	// that is the length of the string plus the null byte
+		return 0;
 	}
 
 	outb(0xff, ioport+0x0e);	// trigger conversion (value can be anything, but register must be written)
 
-	/*for (timeout = 0; timeout < 25; timeout++)
-	{	// waiting for the data to arrive
-		printk(KERN_INFO "mypci driver_read wait for ready %d\n", timeout);
-		// try a max of 25 times, else error out
-		status = inb(ioport+0x08);	// read a/d status again
-		if ((status & 0x10) == 0) break;	// stop if data arrived
-		usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
-	}
-	if ((status & 0x10) > 0)
-	{	// if we left the loop because of timeout
-		printk(KERN_INFO "mypci driver_read [TIMEOUT] waiting for data (busy)\n");
-		raw_copy_to_user(user, "[TIMEOUT] waiting for data (busy)\n", 35);
-		return 35;	// that is the length of the string plus the null byte
-	}*/
-	usleep_range(10, 20);	// sleep for a minimum of 100 microseconds and maximum of 1 millisecond
+	usleep_range(10, 20);	// sleep for a minimum of 10 and a maximum of 20 microseconds
 
-	data = inw(ioport+0);// & 0xfff0;	// read a/d input register, truncating the bits encoding the channel number
+	data = inw(ioport+0);	// read a/d input register
 	printk(KERN_INFO "mypci driver_read raw data: %d\n", data);
-	/*	                  1     10
-		Voltage = data × ——— × ————
-		                  K    gain
-		K    = 2047×16 = 32752
-		gain = 1		*/
-	/* if we have 64 bit to do the calculation, and our dividend is only 16 bit, we can use the rest to get more precision!
-	the above requires us to multiply data by ten, we should be able to do that 13 more times without risking an overflow.
-	that means 13 decimal places for free! with no floating point magic whatsoever! yaay!
-	*/
-	/*pow = 1;
-	for (i = 0; i < 13; i++)
-	{
-		pow = pow * 10;
-	}
-	printk(KERN_INFO "mypci driver_read pow reached: %lld\n", pow);
-	volt = div_s64((s64) data * 10 * pow, 32752);	// kinda adjusted formula: data boosted to 13 extra decimal places, devision only last step
-	printk(KERN_INFO "mypci driver_read raw volt calculation: %lld\n", volt);
-	length = snprintf(outs, 32, "%lld", volt);	// format the read number to a string
-	printk(KERN_INFO "mypci driver_read volt without dot: %s (%d)\n", outs, length);
-	// wait a minute, what about the decimal point?
-	minus = (outs[0] == "-")
-	if (length-minus < 13)
-	{
-		for (int i = 13+minus - length; i > 0; i--)
-		{
-			outs
-		}
-	}
-	for (i = length; i > length-13; i--)
-	{	// shift 14 digits one place later
-		outs[i] = outs[i-1];
-	}
-	printk(KERN_INFO "mypci driver_read shifted 13 digits: %s\n", outs);
-	outs[length-13] = '.';	// insert the dot
-	printk(KERN_INFO "mypci driver_read here comes the dot: %s\n", outs);
-	length = snprintf(outs, 32, "%s V\n", outs);	// typeset the whole to a string of max length of 32 (including null character)
-	printk(KERN_INFO "mypci driver_read nice typesetting: %s\n", outs);
-	raw_copy_to_user(user, &outs, length+1);	// and out with it to userspace!
-	printk(KERN_INFO "mypci driver_read fully typeset: %s\n", outs);
-	return length+1;*/
 	raw_copy_to_user(user, &data, 2);
 	return 2;
 }
@@ -235,7 +174,7 @@ static void __exit mod_exit(void)
 {	// when the module is unloaded
 	printk(KERN_INFO "mypci mod_exit\n");
 
-	pci_unregister_driver( &pci_drv );
+	pci_unregister_driver( &pci_drv );	// give up the driver
 
 	device_destroy( mypci_class, mypci_dev_number );  // remove the device file
 	class_destroy( mypci_class );
